@@ -106,3 +106,31 @@ def debug_html():
         return r.text[:5000], 200, {'Content-Type': 'text/plain'}
     except Exception as e:
         return str(e), 500
+
+@app.route('/debug-overnight')
+def debug_overnight():
+    ticker = request.args.get('ticker', 'NOW')
+    try:
+        url = f'https://finance.yahoo.com/quote/{ticker}/'
+        r = session.get(url, timeout=15)
+        html = r.text
+        
+        # Search for any overnight related content
+        import re
+        
+        # Find all data-testid attributes
+        testids = re.findall(r'data-testid="([^"]*overnight[^"]*)"', html, re.IGNORECASE)
+        
+        # Find any text near "overnight"
+        overnight_context = re.findall(r'.{100}overnight.{100}', html, re.IGNORECASE)
+        
+        # Also search for BOATS
+        boats_context = re.findall(r'.{100}boats.{100}', html, re.IGNORECASE)
+        
+        return jsonify({
+            'testids_found': testids,
+            'overnight_context': overnight_context[:3],
+            'boats_context': boats_context[:3]
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)})
