@@ -85,8 +85,37 @@ def quote():
 @app.route('/overnight')
 def overnight():
     tickers = [t.strip().upper() for t in request.args.get('tickers', '').split(',') if t.strip()]
+    
+    def scrape_overnight(ticker):
+        try:
+            url = f'https://finance.yahoo.com/quote/{ticker}/'
+            r = session.get(url, timeout=15)
+            html = r.text
+            
+            import re, json
+            
+            # Extract the embedded JSON blob containing overnight data
+            match = re.search(r'"overnightMarketPrice":\{"raw":([\d.]+)', html)
+            change_match = re.search(r'"overnightMarketChange":\{"raw":(-?[\d.]+)', html)
+            pct_match = re.search(r'"overnightMarketChangePercent":\{"raw":(-?[\d.]+)', html)
+            
+            if match:
+                price = float(match.group(1))
+                change = float(change_match.group(1)) if change_match else None
+                pct = round(float(pct_match.group(1)) * 100, 4) if pct_match else None
+                return ticker, {
+                    'overnightPrice': price,
+                    'overnightChange': change,
+                    'overnightChangePct': pct,
+                    'source': 'BOATS'
+                }
+            else:
+                return ticker, {'overnightPrice': None}
+        except Exception as e:
+            return ticker, {'error': str(e)}
+    
     with ThreadPoolExecutor(max_workers=5) as ex:
-        results = dict(ex.map(fetch_overnight, tickers))
+        results = dict(ex.map(scrape_overnight, tickers))
     return jsonify(results)
 
 @app.route('/ping')
