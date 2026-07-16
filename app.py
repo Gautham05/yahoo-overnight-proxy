@@ -72,3 +72,12 @@ def quote():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000)
+    
+@app.route('/debug')
+def debug():
+    global CRUMB
+    try:
+        CRUMB = get_crumb()
+        return jsonify({'crumb': CRUMB, 'status': 'ok'})
+    except Exception as e:
+        return jsonify({'error': str(e)})
