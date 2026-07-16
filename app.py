@@ -144,22 +144,10 @@ def debug_overnight():
         r = session.get(url, timeout=15)
         html = r.text
         
-        # Search for any overnight related content
         import re
+        # Get everything around overnightMarket
+        contexts = re.findall(r'.{50}overnightMarket.{200}', html, re.IGNORECASE)
         
-        # Find all data-testid attributes
-        testids = re.findall(r'data-testid="([^"]*overnight[^"]*)"', html, re.IGNORECASE)
-        
-        # Find any text near "overnight"
-        overnight_context = re.findall(r'.{100}overnight.{100}', html, re.IGNORECASE)
-        
-        # Also search for BOATS
-        boats_context = re.findall(r'.{100}boats.{100}', html, re.IGNORECASE)
-        
-        return jsonify({
-            'testids_found': testids,
-            'overnight_context': overnight_context[:3],
-            'boats_context': boats_context[:3]
-        })
+        return jsonify({'contexts': contexts})
     except Exception as e:
         return jsonify({'error': str(e)})
