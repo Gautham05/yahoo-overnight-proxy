@@ -95,3 +95,14 @@ def ping():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000)
+    
+@app.route('/debug-html')
+def debug_html():
+    ticker = request.args.get('ticker', 'NOW')
+    try:
+        url = f'https://finance.yahoo.com/quote/{ticker}/'
+        r = session.get(url, timeout=15)
+        # Return first 5000 chars to see what Yahoo is sending
+        return r.text[:5000], 200, {'Content-Type': 'text/plain'}
+    except Exception as e:
+        return str(e), 500
