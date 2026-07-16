@@ -6,7 +6,6 @@ app = Flask(__name__)
 CORS(app)
 
 session = cffi_requests.Session(impersonate='chrome120')
-CRUMB = None
 
 FIELDS = ','.join([
     'regularMarketPrice','regularMarketPreviousClose',
@@ -16,36 +15,20 @@ FIELDS = ','.join([
     'marketState'
 ])
 
-def get_crumb():
-    session.get('https://finance.yahoo.com', timeout=15)
-    r = session.get('https://query1.finance.yahoo.com/v1/test/getcrumb', timeout=10)
-    return r.text.strip()
-
-def fetch_quotes(symbols):
-    global CRUMB
-    if not CRUMB:
-        CRUMB = get_crumb()
-
-    url = f'https://query1.finance.yahoo.com/v7/finance/quote?symbols={symbols}&fields={FIELDS}&crumb={CRUMB}&formatted=false&region=US&lang=en-US'
-    r = session.get(url, timeout=10)
-    data = r.json()
-
-    # If crumb expired refresh and retry
-    error = data.get('finance', {}).get('error') or data.get('quoteResponse', {}).get('error')
-    if error:
-        CRUMB = get_crumb()
-        url = f'https://query1.finance.yahoo.com/v7/finance/quote?symbols={symbols}&fields={FIELDS}&crumb={CRUMB}&formatted=false&region=US&lang=en-US'
-        r = session.get(url, timeout=10)
-        data = r.json()
-
-    return data.get('quoteResponse', {}).get('result', [])
-
 @app.route('/quote')
 def quote():
     tickers = [t.strip().upper() for t in request.args.get('tickers', '').split(',') if t.strip()]
+    crumb = request.args.get('crumb', '')
     symbols = ','.join(tickers)
+
+    if not crumb:
+        return jsonify({'error': 'crumb required'}), 400
+
     try:
-        quotes = fetch_quotes(symbols)
+        url = f'https://query1.finance.yahoo.com/v7/finance/quote?symbols={symbols}&fields={FIELDS}&crumb={crumb}&formatted=false&region=US&lang=en-US'
+        r = session.get(url, timeout=10)
+        data = r.json()
+        quotes = data.get('quoteResponse', {}).get('result', [])
         result = {}
         for q in quotes:
             ticker = q.get('symbol')
@@ -66,18 +49,7 @@ def quote():
             }
         return jsonify(result)
     except Exception as e:
-        global CRUMB
-        CRUMB = None
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000)
-    
-@app.route('/debug')
-def debug():
-    global CRUMB
-    try:
-        CRUMB = get_crumb()
-        return jsonify({'crumb': CRUMB, 'status': 'ok'})
-    except Exception as e:
-        return jsonify({'error': str(e)})
