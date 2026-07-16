@@ -92,21 +92,17 @@ def overnight():
             r = session.get(url, timeout=15)
             html = r.text
             
-            import re, json
+            import re
             
-            # Extract the embedded JSON blob containing overnight data
-            match = re.search(r'"overnightMarketPrice":\{"raw":([\d.]+)', html)
-            change_match = re.search(r'"overnightMarketChange":\{"raw":(-?[\d.]+)', html)
-            pct_match = re.search(r'"overnightMarketChangePercent":\{"raw":(-?[\d.]+)', html)
-            
-            if match:
-                price = float(match.group(1))
-                change = float(change_match.group(1)) if change_match else None
-                pct = round(float(pct_match.group(1)) * 100, 4) if pct_match else None
+            price_match = re.search(r'overnightMarketPrice[^{]*\{[^}]*\\\"raw\\\":([\d.]+)', html)
+            change_match = re.search(r'overnightMarketChange\\\":\{[^}]*\\\"raw\\\":(-?[\d.]+)', html)
+            pct_match = re.search(r'overnightMarketChangePercent\\\":\{[^}]*\\\"raw\\\":(-?[\d.]+)', html)
+
+            if price_match:
                 return ticker, {
-                    'overnightPrice': price,
-                    'overnightChange': change,
-                    'overnightChangePct': pct,
+                    'overnightPrice':     float(price_match.group(1)),
+                    'overnightChange':    float(change_match.group(1)) if change_match else None,
+                    'overnightChangePct': round(float(pct_match.group(1)), 4) if pct_match else None,
                     'source': 'BOATS'
                 }
             else:
@@ -117,7 +113,7 @@ def overnight():
     with ThreadPoolExecutor(max_workers=5) as ex:
         results = dict(ex.map(scrape_overnight, tickers))
     return jsonify(results)
-
+    
 @app.route('/ping')
 def ping():
     return 'ok', 200
